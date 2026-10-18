@@ -1,0 +1,15 @@
+
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Agendamentos</title>
+<style>body{background:#0a0a0a;color:#fff;font-family:Arial;padding:30px} .card{background:#111;border:1px solid #222;padding:20px;border-radius:12px;margin:10px 0} .btn{padding:8px 14px;border-radius:6px;text-decoration:none}</style>
+</head><body>
+<h1>Agendamentos - {{ agendamentos|length }} pedidos</h1><a href="/" style="color:#d4af37">← Voltar pro site</a>
+{% for a in agendamentos %}
+<div class="card">
+<b>{{ a['nome'] }}</b> - {{ a['tipo'] }} - {{ a['data_evento'] }} {{ a['horario'] }} - {{ a['status'] }}<br>
+Whats: {{ a['whatsapp'] }} - Local: {{ a['local'] }}<br>
+<p>{{ a['mensagem'] }}</p>
+<small>{{ a['criado'] }}</small><br><br>
+<a href="https://wa.me/{{ a['whatsapp']|replace('(','')|replace(')','')|replace('-','')|replace(' ','') }}" target="_blank" style="background:#25D366;color:#fff;padding:8px 12px;border-radius:6px;text-decoration:none">Chamar no WhatsApp</a>
+</div>
+{% endfor %}
+</body></html>
