@@ -5,7 +5,7 @@ from datetime import datetime
 import sqlite3
 app = Flask(__name__)
 app.secret_key = "foto-jumirim-2026"
-UPLOAD_FOLDER = "static/uploads"
+UPLOAD_FOLDER = "/tmp/static/uploads"
 ALLOWED = {"png","jpg","jpeg","webp"}
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -15,7 +15,7 @@ GOOGLE_REVIEW_LINK = "https://g.page/r/SEU_LINK/review"
 NOME_FOTOGRAFO = "Alice - Fotos"
 ADMIN_SENHA = "666777"
 def init_db():
-    con = sqlite3.connect("fotos.db")
+  UPLOAD_FOLDER = "/tmp/static/uploads"
     cur = con.cursor()
     cur.execute("CREATE TABLE IF NOT EXISTS fotos (id INTEGER PRIMARY KEY, filename TEXT, titulo TEXT, categoria TEXT, descricao TEXT, data TEXT, likes INTEGER DEFAULT 0)")
     cur.execute("CREATE TABLE IF NOT EXISTS comentarios (id INTEGER PRIMARY KEY, foto_id INTEGER, nome TEXT, texto TEXT, data TEXT)")
@@ -27,7 +27,7 @@ def allowed_file(f):
     return "." in f and f.rsplit(".",1)[1].lower() in ALLOWED
 @app.route("/")
 def index():
-    con = sqlite3.connect("fotos.db")
+    con = sqlite3.connect("/tmp/fotos.db")
     con.row_factory = sqlite3.Row
     fotos = con.execute("SELECT * FROM fotos ORDER BY id DESC").fetchall()
     comentarios = {}
@@ -55,7 +55,7 @@ def upload():
     if file and allowed_file(file.filename):
         filename = datetime.now().strftime("%Y%m%d%H%M%S_") + secure_filename(file.filename)
         file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
-        con = sqlite3.connect("fotos.db")
+        con = sqlite3.connect("/tmp/fotos.db")
         con.execute("INSERT INTO fotos (filename,titulo,categoria,descricao,data,likes) VALUES (?,?,?,?,?,0)", (filename,titulo,categoria,descricao,datetime.now().strftime("%d/%m/%Y")))
         con.commit()
         con.close()
@@ -78,7 +78,7 @@ def delete_foto(foto_id):
     return redirect(url_for("index"))
 @app.route("/like/<int:foto_id>")
 def like(foto_id):
-    con = sqlite3.connect("fotos.db")
+    con = sqlite3.connect("/tmp/fotos.db")
     con.execute("UPDATE fotos SET likes=likes+1 WHERE id=?", (foto_id,))
     con.commit()
     con.close()
@@ -89,7 +89,7 @@ def comentar():
     nome = request.form.get("nome")[:50]
     texto = request.form.get("texto")[:300]
     if nome and texto:
-        con = sqlite3.connect("fotos.db")
+        con = sqlite3.connect("/tmp/fotos.db")
         con.execute("INSERT INTO comentarios (foto_id,nome,texto,data) VALUES (?,?,?,?)", (foto_id,nome,texto,datetime.now().strftime("%d/%m %H:%M")))
         con.commit()
         con.close()
@@ -97,7 +97,7 @@ def comentar():
 @app.route("/agendar", methods=["POST"])
 def agendar():
     data = {k: request.form.get(k) for k in ["nome","whatsapp","tipo","data_evento","horario","local","mensagem"]}
-    con = sqlite3.connect("fotos.db")
+    con = sqlite3.connect("/tmp/fotos.db")
     con.execute("INSERT INTO agendamentos (nome,whatsapp,tipo,data_evento,horario,local,mensagem,status,criado) VALUES (?,?,?,?,?,?,?, 'Pendente',?)", (data["nome"],data["whatsapp"],data["tipo"],data["data_evento"],data["horario"],data["local"],data["mensagem"],datetime.now().strftime("%d/%m/%Y %H:%M")))
     con.commit()
     con.close()
@@ -109,7 +109,7 @@ def agendar():
 def lista_agendamentos():
     if not session.get("admin"):
         return redirect(url_for("index"))
-    con = sqlite3.connect("fotos.db")
+    con = sqlite3.connect("/tmp/fotos.db")
     con.row_factory = sqlite3.Row
     ag = con.execute("SELECT * FROM agendamentos ORDER BY id DESC").fetchall()
     con.close()
