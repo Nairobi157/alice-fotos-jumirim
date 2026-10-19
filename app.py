@@ -13,10 +13,17 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 SENHA = "666777"
 WHATSAPP = "5515996216025"
 
-CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME")
-CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY")
-CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET")
+# DEBUG - mostra se variaveis existem
+CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME", "")
+CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY", "")
+CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET", "")
 USE_CLOUDINARY = bool(CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET)
+
+print(f"=== DEBUG CLOUDINARY ===")
+print(f"CLOUD_NAME: {'OK - '+CLOUDINARY_CLOUD_NAME if CLOUDINARY_CLOUD_NAME else 'VAZIO!'}")
+print(f"API_KEY: {'OK - '+CLOUDINARY_API_KEY[:4]+'...' if CLOUDINARY_API_KEY else 'VAZIO!'}")
+print(f"API_SECRET: {'OK - '+CLOUDINARY_API_SECRET[:4]+'...' if CLOUDINARY_API_SECRET else 'VAZIO!'}")
+print(f"USE_CLOUDINARY: {USE_CLOUDINARY}")
 
 if USE_CLOUDINARY:
     try:
@@ -24,7 +31,12 @@ if USE_CLOUDINARY:
         import cloudinary.uploader
         import cloudinary.api
         cloudinary.config(cloud_name=CLOUDINARY_CLOUD_NAME, api_key=CLOUDINARY_API_KEY, api_secret=CLOUDINARY_API_SECRET, secure=True)
-    except: USE_CLOUDINARY=False
+        print("Cloudinary CONFIGURADO COM SUCESSO!")
+    except Exception as e:
+        print(f"Erro config cloudinary: {e}")
+        USE_CLOUDINARY=False
+else:
+    print("Cloudinary DESATIVADO - variaveis vazias!")
 
 def init_db():
     try:
@@ -54,9 +66,13 @@ def get_fotos(album=None):
                     if album and album!=an: continue
                     out.append({'id':pid,'filename':r['secure_url'],'titulo':'Foto','album':an,'data':r['created_at'][:10],'url':r['secure_url'],'public_id':pid})
                 return out
-            except: return []
+            except Exception as e:
+                print(f"Erro listar cloudinary: {e}")
+                return []
         return fotos
-    except: return []
+    except Exception as e:
+        print(f"Erro get_fotos: {e}")
+        return []
 
 def get_albuns():
     try:
@@ -80,6 +96,28 @@ def get_ag():
     try: con=sqlite3.connect(DB_PATH); con.row_factory=sqlite3.Row; ag=con.execute("SELECT * FROM agendamentos ORDER BY id DESC").fetchall(); con.close(); return ag
     except: return []
 
+@app.route('/debug')
+def debug():
+    return f"""
+    <html><body style="background:#000;color:#0f0;font-family:monospace;padding:20px">
+    <h1>DEBUG CLOUDINARY</h1>
+    <p>CLOUD_NAME: {'✅ '+CLOUDINARY_CLOUD_NAME if CLOUDINARY_CLOUD_NAME else '❌ VAZIO - NÃO CONFIGURADO!'}</p>
+    <p>API_KEY: {'✅ '+CLOUDINARY_API_KEY[:6]+'...' if CLOUDINARY_API_KEY else '❌ VAZIO!'}</p>
+    <p>API_SECRET: {'✅ '+CLOUDINARY_API_SECRET[:6]+'...' if CLOUDINARY_API_SECRET else '❌ VAZIO!'}</p>
+    <p>USE_CLOUDINARY: {'✅ ATIVADO' if USE_CLOUDINARY else '❌ DESATIVADO'}</p>
+    <hr>
+    <p>Se algum estiver VAZIO, vai no Vercel > Settings > Environment Variables e confere!</p>
+    <p>Tem que ter EXATAMENTE esses 3 nomes:</p>
+    <ul>
+    <li>CLOUDINARY_CLOUD_NAME = ecffkd3p</li>
+    <li>CLOUDINARY_API_KEY = 478583531779143</li>
+    <li>CLOUDINARY_API_SECRET = seu secret</li>
+    </ul>
+    <p>Marca Production e faz Redeploy!</p>
+    <a href="/admin" style="color:#d4af37">Voltar pro admin</a>
+    </body></html>
+    """
+
 @app.route('/static/uploads/<path:filename>')
 def serve_upload(filename): return send_from_directory(UPLOAD_FOLDER, filename)
 
@@ -95,7 +133,7 @@ def index():
         title=f['titulo'] if isinstance(f,dict) else f[2]; alb=f['album'] if isinstance(f,dict) else f[4]
         html_fotos+=f'<div style="background:#111;border:1px solid #222;border-radius:12px;overflow:hidden"><img src="{img}" style="width:100%;height:200px;object-fit:cover"><div style="padding:10px"><b>{title}</b> - {alb}</div></div>'
     if not html_fotos: html_fotos='<p style="color:#888;text-align:center;grid-column:1/-1">Nenhuma foto ainda - /admin</p>'
-    return f'<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Alice Fotos</title></head><body style="background:#0a0a0a;color:#fff;font-family:Arial;margin:0"><header style="padding:20px;text-align:center;border-bottom:1px solid #222"><h1 style="color:#d4af37">Alice - Fotos Jumirim</h1><a href="/admin" style="background:#d4af37;color:#000;padding:10px 20px;border-radius:20px;text-decoration:none">Admin</a></header><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:15px;padding:20px;max-width:1100px;margin:auto">{html_fotos}</div></body></html>'
+    return f'<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Alice Fotos</title></head><body style="background:#0a0a0a;color:#fff;font-family:Arial;margin:0"><header style="padding:20px;text-align:center;border-bottom:1px solid #222"><h1 style="color:#d4af37">Alice - Fotos Jumirim</h1><a href="/admin" style="background:#d4af37;color:#000;padding:10px 20px;border-radius:20px;text-decoration:none">Admin</a> | <a href="/debug" style="color:#888">Debug</a></header><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:15px;padding:20px;max-width:1100px;margin:auto">{html_fotos}</div></body></html>'
 
 @app.route("/admin", methods=["GET","POST"])
 def admin():
@@ -103,9 +141,10 @@ def admin():
         if request.form.get("senha")==SENHA: session["admin"]=True; return redirect("/admin")
     if not session.get("admin"): return '<html><body style="background:#0a0a0a;color:#fff;display:flex;justify-content:center;align-items:center;height:100vh"><form method="post" style="background:#111;padding:20px;border-radius:10px"><h3>Admin Alice - senha 666777</h3><input type="password" name="senha" placeholder="666777"><button>Entrar</button></form></body></html>'
     album_filtro=request.args.get("album"); fotos=get_fotos(album_filtro); ags=get_ag(); albuns=get_albuns()
-    html=f'<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{{background:#0a0a0a;color:#fff;font-family:Arial;margin:0}}input{{width:100%;padding:10px;margin:5px 0;background:#1a1a1a;border:1px solid #222;color:#fff;border-radius:6px}}</style></head><body><header style="background:#d4af37;color:#000;padding:10px;display:flex;justify-content:space-between"><b>{"☁️ NUVEM ATIVA - fotos nunca somem!" if USE_CLOUDINARY else "⚠️ Configure Cloudinary!"}</b><a href="/admin/logout" style="color:#000">Sair</a></header><div style="padding:20px;max-width:1000px;margin:auto">'
+    status = "☁️ NUVEM ATIVA - fotos nunca somem! ✅" if USE_CLOUDINARY else "⚠️ CLOUDINARY DESATIVADO - veja /debug ❌"
+    html=f'<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{{background:#0a0a0a;color:#fff;font-family:Arial;margin:0}}input{{width:100%;padding:10px;margin:5px 0;background:#1a1a1a;border:1px solid #222;color:#fff;border-radius:6px}}</style></head><body><header style="background:{"#00aa00" if USE_CLOUDINARY else "#aa0000"};color:#fff;padding:15px;display:flex;justify-content:space-between"><b>{status}</b><span><a href="/debug" style="color:#fff;margin-right:15px">Debug</a><a href="/admin/logout" style="color:#fff">Sair</a></span></header><div style="padding:20px;max-width:1000px;margin:auto">'
     if not USE_CLOUDINARY:
-        html+='<div style="background:#442200;border:1px solid #ffaa00;padding:15px;border-radius:10px;margin-bottom:20px">Configure no Vercel: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET e Redeploy!</div>'
+        html+='<div style="background:#442200;border:2px solid #ffaa00;padding:15px;border-radius:10px;margin-bottom:20px"><h3>❌ Cloudinary não ativou!</h3><p>Vai no Vercel > Settings > Environment Variables</p><p>Confere se tem EXATAMENTE:</p><p>CLOUDINARY_CLOUD_NAME = ecffkd3p<br>CLOUDINARY_API_KEY = 478583531779143<br>CLOUDINARY_API_SECRET = (seu secret)</p><p>Marca Production e faz Redeploy! Depois clica em <a href="/debug" style="color:#d4af37">/debug</a> pra ver!</p></div>'
     html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px"><div style="background:#111;padding:15px;border-radius:10px"><h3>Postar Foto</h3><form action="/upload" method="post" enctype="multipart/form-data"><input name="album" placeholder="Nome da pasta: Ex: Casamento Ana" required><input name="titulo" placeholder="Titulo da foto" required><input type="file" name="foto" accept="image/*" required style="color:#fff"><button style="width:100%;background:#d4af37;padding:12px;border:none;border-radius:6px;font-weight:bold;margin-top:10px">POSTAR NA NUVEM</button></form></div><div style="background:#111;padding:15px;border-radius:10px"><h3>Pastas</h3>'
     for a in albuns:
         nome=a['album'] if isinstance(a,dict) else a[0]; qtd=a['qtd'] if isinstance(a,dict) else a[1]
@@ -132,7 +171,9 @@ def upload():
                 result=cloudinary.uploader.upload(file, folder=f"alice-fotos-jumirim/{album}", public_id=datetime.now().strftime("%Y%m%d%H%M%S_")+secure_filename(file.filename).rsplit('.',1)[0], overwrite=True)
                 url=result['secure_url']; public_id=result['public_id']
                 con=sqlite3.connect(DB_PATH); con.execute("INSERT INTO fotos (filename,titulo,categoria,album,data,likes,url,public_id) VALUES (?,?,?,?,?,?,?,?)",(url,titulo,"Ensaio",album,datetime.now().strftime("%d/%m/%Y"),0,url,public_id)); con.commit(); con.close()
+                print(f"Upload Cloudinary OK: {public_id}")
             except Exception as e:
+                print(f"Erro upload cloudinary: {e}")
                 filename=datetime.now().strftime("%Y%m%d%H%M%S_")+secure_filename(file.filename); file.save(os.path.join(UPLOAD_FOLDER, filename))
                 con=sqlite3.connect(DB_PATH); con.execute("INSERT INTO fotos (filename,titulo,categoria,album,data,likes) VALUES (?,?,?,?,?,0)",(filename,titulo,"Ensaio",album,datetime.now().strftime("%d/%m/%Y"))); con.commit(); con.close()
         else:
