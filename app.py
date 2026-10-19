@@ -271,7 +271,6 @@ document.getElementById('lb-img').onclick=function(e){
 <footer style="text-align:center;padding:20px;color:#444"><small>Fotos protegidas - Alice Fotos</small></footer>
 </body></html>
 """
-"""
 
 ADMIN_LOGIN = """
 <html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin</title></head>
