@@ -9,13 +9,14 @@ UPLOAD_FOLDER = "/tmp/static/uploads"
 ALLOWED = {"png","jpg","jpeg","webp"}
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs("/tmp", exist_ok=True)
 WHATSAPP = "5515996216025"
 INSTAGRAM = "seu.instagram"
 GOOGLE_REVIEW_LINK = "https://g.page/r/SEU_LINK/review"
 NOME_FOTOGRAFO = "Alice - Fotos"
 ADMIN_SENHA = "666777"
 def init_db():
-  UPLOAD_FOLDER = "/tmp/static/uploads"
+    con = sqlite3.connect("/tmp/fotos.db")
     cur = con.cursor()
     cur.execute("CREATE TABLE IF NOT EXISTS fotos (id INTEGER PRIMARY KEY, filename TEXT, titulo TEXT, categoria TEXT, descricao TEXT, data TEXT, likes INTEGER DEFAULT 0)")
     cur.execute("CREATE TABLE IF NOT EXISTS comentarios (id INTEGER PRIMARY KEY, foto_id INTEGER, nome TEXT, texto TEXT, data TEXT)")
@@ -64,7 +65,7 @@ def upload():
 def delete_foto(foto_id):
     if not session.get("admin"):
         return "Sem permissao", 403
-    con = sqlite3.connect("fotos.db")
+    con = sqlite3.connect("/tmp/fotos.db")
     row = con.execute("SELECT filename FROM fotos WHERE id=?", (foto_id,)).fetchone()
     if row:
         try:
