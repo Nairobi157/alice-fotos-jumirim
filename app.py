@@ -170,20 +170,23 @@ def like(foto_id):
 PUBLIC_HTML = """
 <html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Alice Fotos - Jumirim</title>
 <style>
-body{background:#0a0a0a;color:#fff;font-family:Arial;margin:0}
-.card{background:#111;border:1px solid #222;border-radius:12px;overflow:hidden;cursor:pointer}
-.card img{width:100%;height:220px;object-fit:cover}
-#lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.95);display:none;align-items:center;justify-content:center;z-index:9999;flex-direction:column}
-#lightbox img{max-width:90vw;max-height:85vh;object-fit:contain;transition:transform .3s;cursor:zoom-in}
-#lightbox.zoomed img{transform:scale(2);cursor:zoom-out}
+body{background:#0a0a0a;color:#fff;font-family:Arial;margin:0;-webkit-user-select:none;user-select:none}
+.card{background:#111;border:1px solid #222;border-radius:12px;overflow:hidden;cursor:pointer;position:relative}
+.card img{width:100%;height:220px;object-fit:cover;pointer-events:none}
+.card .watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-25deg);color:rgba(255,255,255,0.25);font-size:28px;font-weight:bold;border:2px solid rgba(255,255,255,0.2);padding:5px 15px;pointer-events:none;z-index:2}
+.card .overlay{position:absolute;inset:0;z-index:3;background:transparent}
+#lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.98);display:none;align-items:center;justify-content:center;z-index:9999;flex-direction:column}
+#lightbox img{max-width:90vw;max-height:80vh;object-fit:contain;pointer-events:none}
+#lightbox .lb-watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-20deg);color:rgba(255,255,255,0.18);font-size:42px;font-weight:bold;border:3px solid rgba(255,255,255,0.15);padding:10px 25px;pointer-events:none;z-index:10}
+#lightbox .lb-overlay{position:absolute;inset:0;z-index:5}
 header{padding:20px;text-align:center;border-bottom:1px solid #222}
-input,select,textarea{width:100%;padding:10px;margin:5px 0;background:#1a1a1a;border:1px solid #222;color:#fff;border-radius:6px}
+input,select,textarea{width:100%;padding:10px;margin:5px 0;background:#1a1a1a;border:1px solid #222;color:#fff;border-radius:6px;-webkit-user-select:text;user-select:text}
 button{background:#d4af37;color:#000;border:none;padding:12px;border-radius:8px;font-weight:bold}
 </style>
-</head><body>
+</head><body oncontextmenu="return false">
 <header>
-<h1 style="color:#d4af37">Alice • Fotos Jumirim</h1>
-<p style="color:#888">Clique na foto para ver inteira e dar zoom</p>
+<h1 style="color:#d4af37">Alice Fotos Jumirim</h1>
+<p style="color:#888">Fotos com protecao - Clique para ver</p>
 <div style="margin-top:10px">
 <a href="/" style="background:#222;color:#fff;padding:8px 15px;border-radius:20px;text-decoration:none;margin:2px">Todas</a>
 {% for a in albuns %}
@@ -191,57 +194,83 @@ button{background:#d4af37;color:#000;border:none;padding:12px;border-radius:8px;
 {% endfor %}
 </div>
 <div style="margin-top:15px">
-<a href="#agendar" style="background:#d4af37;color:#000;padding:10px 20px;border-radius:20px;text-decoration:none;font-weight:bold">📅 Agendar</a>
-<a href="#avaliar" style="background:#fff;color:#000;padding:10px 20px;border-radius:20px;text-decoration:none;margin-left:5px">⭐ Avaliar</a>
-<a href="https://wa.me/{{whatsapp}}" style="background:#25D366;color:#fff;padding:10px 20px;border-radius:20px;text-decoration:none;margin-left:5px">💬 WhatsApp</a>
+<a href="#agendar" style="background:#d4af37;color:#000;padding:10px 20px;border-radius:20px;text-decoration:none;font-weight:bold">Agendar</a>
+<a href="#avaliar" style="background:#fff;color:#000;padding:10px 20px;border-radius:20px;text-decoration:none;margin-left:5px">Avaliar</a>
+<a href="https://wa.me/{{whatsapp}}" style="background:#25D366;color:#fff;padding:10px 20px;border-radius:20px;text-decoration:none;margin-left:5px">WhatsApp</a>
 </div>
 </header>
-{% if album_ativo %}<div style="text-align:center;padding:15px;background:#111"><h2 style="color:#d4af37">📁 {{album_ativo}}</h2><a href="/" style="color:#888">← Voltar</a></div>{% endif %}
+{% if album_ativo %}<div style="text-align:center;padding:15px;background:#111"><h2 style="color:#d4af37">📁 {{album_ativo}}</h2><a href="/" style="color:#888">Voltar</a></div>{% endif %}
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:15px;padding:20px;max-width:1200px;margin:auto">
 {% for f in fotos %}
-<div class="card" onclick="abrir('/static/uploads/{{f['filename']}}','{{f['titulo']}} - {{f['album']}}')">
-<img src="/static/uploads/{{f['filename']}}" loading="lazy">
-<div style="padding:10px"><b>{{f['titulo']}}</b><br><small style="color:#d4af37">📁 {{f['album']}}</small> • <small style="color:#666">{{f['data']}}</small></div>
+<div class="card" onclick="abrir('/static/uploads/{{f['filename']}}','{{f['titulo']}}')">
+<img src="/static/uploads/{{f['filename']}}" loading="lazy" draggable="false" ondragstart="return false">
+<div class="watermark">PROVA</div>
+<div class="overlay"></div>
+<div style="padding:10px;position:relative;z-index:4"><b>{{f['titulo']}}</b><br><small style="color:#d4af37">📁 {{f['album']}}</small><br><small style="color:#555;font-size:10px">Protegida contra download</small></div>
 </div>
 {% endfor %}
-{% if not fotos %}<p style="color:#888;grid-column:1/-1;text-align:center;padding:40px">Nenhuma foto ainda</p>{% endif %}
+{% if not fotos %}<p style="color:#888;grid-column:1/-1;text-align:center;padding:40px">Nenhuma foto ainda<br><small style="color:#555">IMPORTANTE: No Vercel free as fotos somem se fizer novo deploy. Nao mexa no codigo depois de postar!</small></p>{% endif %}
 </div>
-<div id="avaliar" style="background:#0a0a0a;padding:50px 20px;border-top:1px solid #222">
+<div id="avaliar" style="background:#0a0a0a;padding:40px 20px;border-top:1px solid #222">
 <div style="max-width:900px;margin:auto;text-align:center">
-<h2 style="color:#d4af37">⭐ Avalie nosso trabalho no Google!</h2>
-<p style="color:#888">Sua avaliação ajuda muito!</p>
-<div style="font-size:40px">⭐⭐⭐⭐⭐</div>
-<a href="{{google_link}}" target="_blank" style="background:#fff;color:#000;padding:15px 30px;border-radius:30px;text-decoration:none;display:inline-block;font-weight:bold;margin-top:15px">Avaliar no Google</a>
+<h2 style="color:#d4af37">Avalie no Google!</h2>
+<a href="{{google_link}}" target="_blank" style="background:#fff;color:#000;padding:12px 25px;border-radius:30px;text-decoration:none;display:inline-block;font-weight:bold">Avaliar no Google</a>
 </div>
 </div>
 <div id="agendar" style="background:#111;border-top:1px solid #222;padding:40px 20px">
-<div style="max-width:500px;margin:auto"><h2 style="color:#d4af37;text-align:center">📅 Agendar Ensaio</h2>
+<div style="max-width:500px;margin:auto"><h2 style="color:#d4af37;text-align:center">Agendar Ensaio</h2>
 <form action="/agendar" method="post">
 <input name="nome" placeholder="Seu nome" required>
 <input name="whatsapp" placeholder="WhatsApp" required>
 <select name="tipo"><option>Ensaio Feminino</option><option>Casamento</option><option>Evento</option></select>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><input name="data_evento" type="date" required><input name="local" placeholder="Local"></div>
 <textarea name="mensagem" placeholder="Mensagem" rows="3"></textarea>
-<button style="width:100%">📲 Enviar pro WhatsApp</button>
+<button style="width:100%">Enviar pro WhatsApp</button>
 </form></div>
 </div>
 <div id="lightbox" onclick="fechar(event)">
-<img id="lb-img" src="">
-<div style="text-align:center;color:#fff;margin-top:10px"><span id="lb-txt"></span><br><small style="color:#888">Clique na foto para zoom • Clique fora para fechar</small><br><a id="lb-download" href="" download style="color:#d4af37">⬇️ Baixar</a></div>
+<div style="position:relative;display:flex;align-items:center;justify-content:center">
+<img id="lb-img" src="" draggable="false" ondragstart="return false">
+<div class="lb-watermark">ALICE FOTOS - PROVA</div>
+<div class="lb-overlay"></div>
+</div>
+<div style="text-align:center;color:#fff;margin-top:15px;position:relative;z-index:20"><span id="lb-txt"></span><br><small style="color:#888">Protegida - Clique fora para fechar - Print bloqueado</small></div>
 </div>
 <script>
+document.addEventListener('contextmenu', e=>e.preventDefault());
+document.addEventListener('dragstart', e=>e.preventDefault());
+document.addEventListener('keydown', e=>{
+  if(e.key==='PrintScreen' || (e.ctrlKey && ['p','s','u','c'].includes(e.key.toLowerCase())) || e.key==='F12'){
+    e.preventDefault();
+    alert('Conteudo protegido');
+    return false;
+  }
+});
+window.addEventListener('keyup', e=>{
+  if(e.key==='PrintScreen'){
+    document.body.style.filter='blur(20px)';
+    alert('Print bloqueado - Fotos protegidas');
+    setTimeout(()=>document.body.style.filter='',1000);
+  }
+});
 function abrir(src, txt){
  document.getElementById('lb-img').src=src;
  document.getElementById('lb-txt').innerText=txt;
- document.getElementById('lb-download').href=src;
  document.getElementById('lightbox').style.display='flex';
- document.getElementById('lightbox').classList.remove('zoomed');
 }
-function fechar(e){ if(e.target.id==='lightbox'){ document.getElementById('lightbox').style.display='none'; } }
-document.getElementById('lb-img').onclick=function(e){ e.stopPropagation(); document.getElementById('lightbox').classList.toggle('zoomed'); }
+function fechar(e){ 
+  if(e.target.id==='lightbox' || e.target.classList.contains('lb-overlay')){ 
+    document.getElementById('lightbox').style.display='none'; 
+  } 
+}
+document.getElementById('lb-img').onclick=function(e){
+ e.stopPropagation();
+ document.getElementById('lightbox').classList.toggle('zoomed');
+}
 </script>
-<footer style="text-align:center;padding:30px;color:#555"><a href="/admin" style="color:#333">Área da fotógrafa</a></footer>
+<footer style="text-align:center;padding:20px;color:#444"><small>Fotos protegidas - Alice Fotos</small></footer>
 </body></html>
+"""
 """
 
 ADMIN_LOGIN = """
