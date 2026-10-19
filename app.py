@@ -125,14 +125,21 @@ def upload():
 
 @app.route("/delete/<int:foto_id>")
 def delete_foto(foto_id):
-    con = sqlite3.connect(DB_PATH)
-    row = con.execute("SELECT filename FROM fotos WHERE id=?", (foto_id,)).fetchone()
-    if row:
-        try: os.remove(os.path.join(UPLOAD_FOLDER, row[0]))
-        except: pass
-        con.execute("DELETE FROM fotos WHERE id=?", (foto_id,))
-        con.commit()
-    con.close()
+    if not session.get("admin"):
+        return redirect("/admin")
+    try:
+        con = sqlite3.connect(DB_PATH)
+        row = con.execute("SELECT filename FROM fotos WHERE id=?", (foto_id,)).fetchone()
+        if row:
+            try: 
+                os.remove(os.path.join(UPLOAD_FOLDER, row[0]))
+            except: 
+                pass
+            con.execute("DELETE FROM fotos WHERE id=?", (foto_id,))
+            con.commit()
+        con.close()
+    except Exception as e:
+        print(f"Erro ao apagar {foto_id}: {e}")
     return redirect("/admin")
 
 @app.route("/delete_album/<path:album_nome>")
@@ -297,7 +304,7 @@ input,select{padding:10px;background:#1a1a1a;border:1px solid #222;color:#fff;bo
 <h3 style="margin-top:30px">Fotos recentes</h3>
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">
 {% for f in fotos[:60] %}
-<div class="card"><img src="/static/uploads/{{f['filename']}}"><div style="padding:6px"><small>{{f['album']}}<br>{{f['titulo']}}</small><br><a href="/delete/{{f[0]}}" style="color:#ff6666;font-size:11px" onclick="return confirm('Apagar?')">Apagar</a></div></div>
+<div class="card"><img src="/static/uploads/{{f['filename']}}"><div style="padding:8px"><small style="color:#d4af37">{{f['album']}}</small><br><b style="font-size:12px">{{f['titulo']}}</b><br><small style="color:#666">ID {{f[0]}}</small><br><a href="/delete/{{f[0]}}" style="background:#ff4444;color:#fff;padding:5px 10px;border-radius:5px;font-size:12px;font-weight:bold;display:inline-block;margin-top:5px;text-decoration:none" onclick="return confirm('Tem certeza que quer apagar {{f['titulo']}}?')">🗑️ APAGAR</a></div></div>
 {% endfor %}
 </div>
 </div>
