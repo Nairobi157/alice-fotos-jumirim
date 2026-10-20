@@ -12,7 +12,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 SENHA = "666777"
 WHATSAPP = "5515996216025"
 INSTAGRAM = "https://www.instagram.com/alicefotosjumirim"
-GOOGLE_REVIEW = "https://www.google.com/search?q=Alice+Fotos+Jumirim"
+GOOGLE_REVIEW = "https://www.google.com/maps/search/?api=1&query=Alice+Fotos+Jumirim+Jumirim+SP"
 
 CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME", "")
 CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY", "")
@@ -81,7 +81,56 @@ def debug():
     fotos=get_fotos()
     return f"<html><body style='background:#000;color:#0f0;padding:20px'><h1>DEBUG</h1><p>NUVEM: {'ATIVADA' if USE_CLOUDINARY else 'DESATIVADA'}</p><p>Total fotos: {len(fotos)}</p><a href='/admin'>Admin</a></body></html>"
 
+
+@app.route('/avaliar', methods=["GET","POST"])
+def avaliar():
+    init_db()
+    if request.method=="POST":
+        nome=request.form.get("nome","Anônimo")[:50]
+        estrelas=request.form.get("estrelas","5")
+        comentario=request.form.get("comentario","")[:500]
+        # Salva como agendamento tipo Avaliação pra você ver no admin
+        try:
+            con=sqlite3.connect(DB_PATH)
+            con.execute("INSERT INTO agendamentos (nome,whatsapp,tipo,data_evento,horario,local,mensagem,status,criado) VALUES (?,?,?,?,?,?,?, 'Avaliação',?)",
+                (nome, "", f"Avaliação {estrelas} estrelas", "", "", "", comentario, datetime.now().strftime("%d/%m/%Y %H:%M")))
+            con.commit(); con.close()
+        except: pass
+        # Manda pro WhatsApp também
+        msg=f"Olá Alice! ⭐ Nova avaliação no site!\n\nNome: {nome}\nEstrelas: {estrelas}/5\nComentário: {comentario}"
+        return redirect(f"https://wa.me/{WHATSAPP}?text="+urllib.parse.quote(msg))
+    # Página de avaliação
+    return f"""<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Avaliar Alice Fotos</title></head>
+    <body style="background:#0a0a0a;color:#fff;font-family:Arial;margin:0">
+    <header style="padding:20px;text-align:center;border-bottom:1px solid #222"><h1 style="color:#d4af37">⭐ Avalie Alice Fotos Jumirim</h1><a href="/" style="color:#d4af37">Voltar ao site</a></header>
+    <div style="max-width:600px;margin:30px auto;padding:20px">
+        <div style="background:#111;border:1px solid #222;border-radius:16px;padding:25px">
+            <h2 style="color:#d4af37;text-align:center">Deixe sua avaliação!</h2>
+            <p style="color:#888;text-align:center">Sua opinião é muito importante!</p>
+            <form method="post">
+                <input name="nome" placeholder="Seu nome" required style="width:100%;padding:12px;margin:8px 0;background:#1a1a1a;border:1px solid #333;color:#fff;border-radius:8px;box-sizing:border-box">
+                <label style="color:#d4af37">Quantas estrelas?</label>
+                <select name="estrelas" style="width:100%;padding:12px;margin:8px 0;background:#1a1a1a;border:1px solid #333;color:#fff;border-radius:8px">
+                    <option value="5">⭐⭐⭐⭐⭐ - 5 estrelas - Amei!</option>
+                    <option value="4">⭐⭐⭐⭐ - 4 estrelas - Muito bom!</option>
+                    <option value="3">⭐⭐⭐ - 3 estrelas - Bom</option>
+                    <option value="2">⭐⭐ - 2 estrelas</option>
+                    <option value="1">⭐ - 1 estrela</option>
+                </select>
+                <textarea name="comentario" placeholder="Conta como foi seu ensaio, o que mais gostou... *" required rows="4" style="width:100%;padding:12px;margin:8px 0;background:#1a1a1a;border:1px solid #333;color:#fff;border-radius:8px;box-sizing:border-box"></textarea>
+                <button style="width:100%;background:#d4af37;color:#000;padding:14px;border:none;border-radius:8px;font-weight:bold;font-size:16px;cursor:pointer">⭐ Enviar Avaliação</button>
+            </form>
+            <div style="margin-top:25px;text-align:center;border-top:1px solid #222;padding-top:20px">
+                <p style="color:#888">Ou avalie direto no Google:</p>
+                <a href="{GOOGLE_REVIEW}" target="_blank" style="background:#fff;color:#000;padding:12px 24px;border-radius:25px;text-decoration:none;font-weight:bold;display:inline-block">⭐ Avaliar no Google Maps</a>
+                <p style="color:#666;font-size:12px;margin-top:10px">Se não tiver Google Meu Negócio ainda, as avaliações vão pro seu WhatsApp e aparecem no seu admin!</p>
+            </div>
+        </div>
+    </div>
+    </body></html>"""
+
 @app.route('/static/uploads/<path:filename>')
+
 def serve_upload(filename): return send_from_directory(UPLOAD_FOLDER, filename)
 
 @app.route("/")
