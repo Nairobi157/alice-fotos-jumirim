@@ -1,4 +1,3 @@
-
 from flask import Flask, request, redirect, session, send_from_directory
 from werkzeug.utils import secure_filename
 from datetime import datetime
@@ -12,31 +11,20 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 SENHA = "666777"
 WHATSAPP = "5515996216025"
+INSTAGRAM = "https://www.instagram.com/alicefotosjumirim"
+GOOGLE_REVIEW = "https://www.google.com/search?q=Alice+Fotos+Jumirim"
 
-# DEBUG - mostra se variaveis existem
 CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME", "")
 CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY", "")
 CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET", "")
 USE_CLOUDINARY = bool(CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET)
 
-print(f"=== DEBUG CLOUDINARY ===")
-print(f"CLOUD_NAME: {'OK - '+CLOUDINARY_CLOUD_NAME if CLOUDINARY_CLOUD_NAME else 'VAZIO!'}")
-print(f"API_KEY: {'OK - '+CLOUDINARY_API_KEY[:4]+'...' if CLOUDINARY_API_KEY else 'VAZIO!'}")
-print(f"API_SECRET: {'OK - '+CLOUDINARY_API_SECRET[:4]+'...' if CLOUDINARY_API_SECRET else 'VAZIO!'}")
-print(f"USE_CLOUDINARY: {USE_CLOUDINARY}")
-
 if USE_CLOUDINARY:
     try:
-        import cloudinary
-        import cloudinary.uploader
-        import cloudinary.api
+        import cloudinary, cloudinary.uploader, cloudinary.api
         cloudinary.config(cloud_name=CLOUDINARY_CLOUD_NAME, api_key=CLOUDINARY_API_KEY, api_secret=CLOUDINARY_API_SECRET, secure=True)
-        print("Cloudinary CONFIGURADO COM SUCESSO!")
-    except Exception as e:
-        print(f"Erro config cloudinary: {e}")
+    except:
         USE_CLOUDINARY=False
-else:
-    print("Cloudinary DESATIVADO - variaveis vazias!")
 
 def init_db():
     try:
@@ -59,25 +47,21 @@ def get_fotos(album=None):
         if USE_CLOUDINARY and len(fotos)==0:
             try:
                 import cloudinary.api
-                result=cloudinary.api.resources(type="upload", prefix="alice-fotos-jumirim", max_results=100)
+                result=cloudinary.api.resources(type="upload", prefix="alice-fotos-jumirim", max_results=200)
                 out=[]
                 for r in result.get('resources',[]):
                     pid=r['public_id']; parts=pid.split('/'); an=parts[1] if len(parts)>1 else "Sem pasta"
                     if album and album!=an: continue
-                    out.append({'id':pid,'filename':r['secure_url'],'titulo':'Foto','album':an,'data':r['created_at'][:10],'url':r['secure_url'],'public_id':pid})
+                    out.append({'id':pid,'titulo':parts[-1],'album':an,'data':r['created_at'][:10],'url':r['secure_url'],'public_id':pid})
                 return out
-            except Exception as e:
-                print(f"Erro listar cloudinary: {e}")
-                return []
+            except: return []
         return fotos
-    except Exception as e:
-        print(f"Erro get_fotos: {e}")
-        return []
+    except: return []
 
 def get_albuns():
     try:
         init_db(); con=sqlite3.connect(DB_PATH); con.row_factory=sqlite3.Row
-        albuns=con.execute("SELECT album, COUNT(*) as qtd FROM fotos GROUP BY album ORDER BY MAX(id) DESC").fetchall(); con.close()
+        albuns=con.execute("SELECT album, COUNT(*) as qtd FROM fotos WHERE album IS NOT NULL AND album!='' GROUP BY album ORDER BY MAX(id) DESC").fetchall(); con.close()
         if USE_CLOUDINARY and len(albuns)==0:
             try:
                 import cloudinary.api; folders=cloudinary.api.subfolders("alice-fotos-jumirim")
@@ -86,75 +70,77 @@ def get_albuns():
                     name=f['name']
                     try: cnt=cloudinary.api.resources(type="upload", prefix=f"alice-fotos-jumirim/{name}", max_results=1).get('total_count',0)
                     except: cnt=0
-                    res.append({'album':name,'qtd':cnt})
+                    if cnt>0: res.append({'album':name,'qtd':cnt})
                 return res
             except: pass
         return albuns
     except: return []
 
-def get_ag():
-    try: con=sqlite3.connect(DB_PATH); con.row_factory=sqlite3.Row; ag=con.execute("SELECT * FROM agendamentos ORDER BY id DESC").fetchall(); con.close(); return ag
-    except: return []
-
 @app.route('/debug')
 def debug():
-    return f"""
-    <html><body style="background:#000;color:#0f0;font-family:monospace;padding:20px">
-    <h1>DEBUG CLOUDINARY</h1>
-    <p>CLOUD_NAME: {'✅ '+CLOUDINARY_CLOUD_NAME if CLOUDINARY_CLOUD_NAME else '❌ VAZIO - NÃO CONFIGURADO!'}</p>
-    <p>API_KEY: {'✅ '+CLOUDINARY_API_KEY[:6]+'...' if CLOUDINARY_API_KEY else '❌ VAZIO!'}</p>
-    <p>API_SECRET: {'✅ '+CLOUDINARY_API_SECRET[:6]+'...' if CLOUDINARY_API_SECRET else '❌ VAZIO!'}</p>
-    <p>USE_CLOUDINARY: {'✅ ATIVADO' if USE_CLOUDINARY else '❌ DESATIVADO'}</p>
-    <hr>
-    <p>Se algum estiver VAZIO, vai no Vercel > Settings > Environment Variables e confere!</p>
-    <p>Tem que ter EXATAMENTE esses 3 nomes:</p>
-    <ul>
-    <li>CLOUDINARY_CLOUD_NAME = ecffkd3p</li>
-    <li>CLOUDINARY_API_KEY = 478583531779143</li>
-    <li>CLOUDINARY_API_SECRET = seu secret</li>
-    </ul>
-    <p>Marca Production e faz Redeploy!</p>
-    <a href="/admin" style="color:#d4af37">Voltar pro admin</a>
-    </body></html>
-    """
+    fotos=get_fotos()
+    return f"<html><body style='background:#000;color:#0f0;padding:20px'><h1>DEBUG</h1><p>NUVEM: {'ATIVADA' if USE_CLOUDINARY else 'DESATIVADA'}</p><p>Total fotos: {len(fotos)}</p><a href='/admin'>Admin</a></body></html>"
 
 @app.route('/static/uploads/<path:filename>')
 def serve_upload(filename): return send_from_directory(UPLOAD_FOLDER, filename)
 
 @app.route("/")
 def index():
-    album_filtro=request.args.get("album"); fotos=get_fotos(album_filtro)
-    try: init_db(); con=sqlite3.connect(DB_PATH); con.row_factory=sqlite3.Row; albuns_raw=con.execute("SELECT album, COUNT(*) as qtd FROM fotos GROUP BY album ORDER BY MAX(id) DESC").fetchall(); con.close()
-    except: albuns_raw=[]
-    if len(albuns_raw)==0 and USE_CLOUDINARY: albuns_raw=get_albuns()
+    album_filtro=request.args.get("album")
+    fotos=get_fotos(album_filtro)
+    albuns=get_albuns()
+    filtros=""
+    for a in albuns:
+        nome=a['album'] if isinstance(a,dict) else a[0]
+        filtros+=f'<a href="/?album={nome}" style="background:#1a1a1a;border:1px solid #333;color:#fff;padding:6px 14px;border-radius:20px;text-decoration:none;margin:4px;display:inline-block">📁 {nome}</a>'
+    filtros+=f'<a href="/" style="background:#d4af37;color:#000;padding:6px 14px;border-radius:20px;text-decoration:none;margin:4px;display:inline-block">Todas</a>'
     html_fotos=""
     for f in fotos:
         img=f['url'] if isinstance(f,dict) else (f[7] if len(f)>7 and f[7] else '/static/uploads/'+f[1])
-        title=f['titulo'] if isinstance(f,dict) else f[2]; alb=f['album'] if isinstance(f,dict) else f[4]
-        html_fotos+=f'<div style="background:#111;border:1px solid #222;border-radius:12px;overflow:hidden"><img src="{img}" style="width:100%;height:200px;object-fit:cover"><div style="padding:10px"><b>{title}</b> - {alb}</div></div>'
-    if not html_fotos: html_fotos='<p style="color:#888;text-align:center;grid-column:1/-1">Nenhuma foto ainda - /admin</p>'
-    return f'<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Alice Fotos</title></head><body style="background:#0a0a0a;color:#fff;font-family:Arial;margin:0"><header style="padding:20px;text-align:center;border-bottom:1px solid #222"><h1 style="color:#d4af37">Alice - Fotos Jumirim</h1><a href="/admin" style="background:#d4af37;color:#000;padding:10px 20px;border-radius:20px;text-decoration:none">Admin</a> | <a href="/debug" style="color:#888">Debug</a></header><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:15px;padding:20px;max-width:1100px;margin:auto">{html_fotos}</div></body></html>'
+        title=f['titulo'] if isinstance(f,dict) else f[2]; alb=f['album'] if isinstance(f,dict) else f[4]; data=f['data'] if isinstance(f,dict) else (f[5] if len(f)>5 else "")
+        msg=urllib.parse.quote(f"Olá Alice! Gostei da foto {title}")
+        html_fotos+=f'<div style="background:#111;border:1px solid #222;border-radius:12px;overflow:hidden"><img src="{img}" loading="lazy" style="width:100%;height:260px;object-fit:cover"><div style="padding:12px"><b style="color:#d4af37">{title}</b><br><small style="color:#888">📁 {alb} • {data}</small><br><a href="https://wa.me/{WHATSAPP}?text={msg}" target="_blank" style="background:#25D366;color:#fff;padding:6px 12px;border-radius:20px;text-decoration:none;font-size:12px;display:inline-block;margin-top:8px">💬 Falar sobre essa foto</a></div></div>'
+    if not html_fotos:
+        html_fotos=f'<p style="color:#888;text-align:center;grid-column:1/-1;padding:40px">Nenhuma foto ainda em {album_filtro if album_filtro else "galeria"}</p>'
+    return f'<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Alice Fotos Jumirim</title></head><body style="background:#0a0a0a;color:#fff;font-family:Arial;margin:0"><header style="padding:25px;text-align:center;border-bottom:1px solid #222"><h1 style="color:#d4af37;margin:0 0 8px 0;font-size:28px">Alice Fotos Jumirim</h1><p style="color:#888;margin:0 0 15px 0">Ensaios • Casamentos • Eventos</p><div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:15px 0"><a href="#agendar" style="background:#d4af37;color:#000;padding:10px 22px;border-radius:25px;text-decoration:none;font-weight:bold">📅 Agendar Ensaio</a><a href="{GOOGLE_REVIEW}" target="_blank" style="background:#fff;color:#000;padding:10px 22px;border-radius:25px;text-decoration:none;font-weight:bold">⭐ Avalie no Google!</a><a href="https://wa.me/{WHATSAPP}" target="_blank" style="background:#25D366;color:#fff;padding:10px 22px;border-radius:25px;text-decoration:none;font-weight:bold">WhatsApp</a></div><div style="margin-top:15px">{filtros}</div></header><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px;padding:25px;max-width:1300px;margin:auto">{html_fotos}</div><div style="background:linear-gradient(135deg,#1a1a1a,#111);padding:50px 20px;text-align:center;border-top:1px solid #222"><h2 style="color:#d4af37">Avalie no Google! ⭐⭐⭐⭐⭐</h2><p style="color:#ccc;max-width:600px;margin:15px auto">Sua avaliação me ajuda muito!</p><a href="{GOOGLE_REVIEW}" target="_blank" style="background:#fff;color:#000;padding:14px 30px;border-radius:30px;text-decoration:none;font-weight:bold;display:inline-block">⭐ Avaliar no Google</a></div><div id="agendar" style="background:#0f0f0f;padding:50px 20px"><div style="max-width:600px;margin:auto;background:#111;border:1px solid #222;border-radius:16px;padding:30px"><h2 style="color:#d4af37;text-align:center">📩 Agendar Ensaio / Mandar Mensagem</h2><p style="color:#888;text-align:center;font-size:14px">Sua mensagem vai direto pro meu WhatsApp!</p><form action="/agendar" method="post"><input name="nome" placeholder="Seu nome *" required style="width:100%;padding:12px;margin:8px 0;background:#1a1a1a;border:1px solid #333;color:#fff;border-radius:8px;box-sizing:border-box"><input name="whatsapp" placeholder="Seu WhatsApp *" required style="width:100%;padding:12px;margin:8px 0;background:#1a1a1a;border:1px solid #333;color:#fff;border-radius:8px;box-sizing:border-box"><select name="tipo" style="width:100%;padding:12px;margin:8px 0;background:#1a1a1a;border:1px solid #333;color:#fff;border-radius:8px"><option>Ensaio Fotográfico</option><option>Casamento</option><option>Aniversário</option><option>Outro</option></select><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><input name="data_evento" type="date" style="padding:12px;background:#1a1a1a;border:1px solid #333;color:#fff;border-radius:8px"><input name="local" placeholder="Local" style="padding:12px;background:#1a1a1a;border:1px solid #333;color:#fff;border-radius:8px"></div><textarea name="mensagem" placeholder="Me conta o que precisa... *" required rows="4" style="width:100%;padding:12px;margin:8px 0;background:#1a1a1a;border:1px solid #333;color:#fff;border-radius:8px;box-sizing:border-box"></textarea><button style="width:100%;background:#25D366;color:#fff;padding:14px;border:none;border-radius:8px;font-weight:bold;font-size:16px">💬 Enviar no WhatsApp</button></form></div></div><footer style="background:#000;padding:30px;text-align:center;border-top:1px solid #222"><p style="color:#d4af37">Alice Fotos Jumirim</p><p style="color:#888;font-size:13px">WhatsApp: (15) 99621-6025</p><div style="margin-top:15px"><a href="{INSTAGRAM}" target="_blank" style="color:#d4af37;margin:0 10px;text-decoration:none">Instagram</a><a href="https://wa.me/{WHATSAPP}" target="_blank" style="color:#25D366;margin:0 10px;text-decoration:none">WhatsApp</a><a href="{GOOGLE_REVIEW}" target="_blank" style="color:#fff;margin:0 10px;text-decoration:none">Avaliar</a></div></footer></body></html>'
+
+@app.route("/agendar", methods=["POST"])
+def agendar():
+    init_db()
+    d = {k: request.form.get(k,"").strip() for k in ["nome","whatsapp","tipo","data_evento","local","mensagem"]}
+    con=sqlite3.connect(DB_PATH)
+    con.execute("INSERT INTO agendamentos (nome,whatsapp,tipo,data_evento,horario,local,mensagem,status,criado) VALUES (?,?,?,?,?,?,?, 'Pendente',?)", (d["nome"],d["whatsapp"],d["tipo"],d["data_evento"],"",d["local"],d["mensagem"],datetime.now().strftime("%d/%m/%Y %H:%M")))
+    con.commit(); con.close()
+    msg = f"Olá Alice! Sou {d['nome']} - Quero agendar: {d['tipo']} Data: {d['data_evento']} Local: {d['local']} Mensagem: {d['mensagem']} Meu Whats: {d['whatsapp']}"
+    return redirect(f"https://wa.me/{WHATSAPP}?text={urllib.parse.quote(msg)}")
 
 @app.route("/admin", methods=["GET","POST"])
 def admin():
     if request.method=="POST":
         if request.form.get("senha")==SENHA: session["admin"]=True; return redirect("/admin")
-    if not session.get("admin"): return '<html><body style="background:#0a0a0a;color:#fff;display:flex;justify-content:center;align-items:center;height:100vh"><form method="post" style="background:#111;padding:20px;border-radius:10px"><h3>Admin Alice - senha 666777</h3><input type="password" name="senha" placeholder="666777"><button>Entrar</button></form></body></html>'
-    album_filtro=request.args.get("album"); fotos=get_fotos(album_filtro); ags=get_ag(); albuns=get_albuns()
-    status = "☁️ NUVEM ATIVA - fotos nunca somem! ✅" if USE_CLOUDINARY else "⚠️ CLOUDINARY DESATIVADO - veja /debug ❌"
-    html=f'<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{{background:#0a0a0a;color:#fff;font-family:Arial;margin:0}}input{{width:100%;padding:10px;margin:5px 0;background:#1a1a1a;border:1px solid #222;color:#fff;border-radius:6px}}</style></head><body><header style="background:{"#00aa00" if USE_CLOUDINARY else "#aa0000"};color:#fff;padding:15px;display:flex;justify-content:space-between"><b>{status}</b><span><a href="/debug" style="color:#fff;margin-right:15px">Debug</a><a href="/admin/logout" style="color:#fff">Sair</a></span></header><div style="padding:20px;max-width:1000px;margin:auto">'
-    if not USE_CLOUDINARY:
-        html+='<div style="background:#442200;border:2px solid #ffaa00;padding:15px;border-radius:10px;margin-bottom:20px"><h3>❌ Cloudinary não ativou!</h3><p>Vai no Vercel > Settings > Environment Variables</p><p>Confere se tem EXATAMENTE:</p><p>CLOUDINARY_CLOUD_NAME = ecffkd3p<br>CLOUDINARY_API_KEY = 478583531779143<br>CLOUDINARY_API_SECRET = (seu secret)</p><p>Marca Production e faz Redeploy! Depois clica em <a href="/debug" style="color:#d4af37">/debug</a> pra ver!</p></div>'
-    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px"><div style="background:#111;padding:15px;border-radius:10px"><h3>Postar Foto</h3><form action="/upload" method="post" enctype="multipart/form-data"><input name="album" placeholder="Nome da pasta: Ex: Casamento Ana" required><input name="titulo" placeholder="Titulo da foto" required><input type="file" name="foto" accept="image/*" required style="color:#fff"><button style="width:100%;background:#d4af37;padding:12px;border:none;border-radius:6px;font-weight:bold;margin-top:10px">POSTAR NA NUVEM</button></form></div><div style="background:#111;padding:15px;border-radius:10px"><h3>Pastas</h3>'
+    if not session.get("admin"):
+        return '<html><body style="background:#0a0a0a;color:#fff;display:flex;justify-content:center;align-items:center;height:100vh;font-family:Arial"><form method="post" style="background:#111;padding:30px;border-radius:12px;text-align:center"><h3 style="color:#d4af37">Admin Alice Fotos</h3><input type="password" name="senha" placeholder="666777" style="padding:10px;width:100%;background:#1a1a1a;border:1px solid #333;color:#fff;border-radius:6px"><br><br><button style="background:#d4af37;color:#000;padding:10px 20px;border:none;border-radius:20px;font-weight:bold">Entrar</button></form></body></html>'
+    album_filtro=request.args.get("album"); fotos=get_fotos(album_filtro)
+    try: con=sqlite3.connect(DB_PATH); con.row_factory=sqlite3.Row; ags=con.execute("SELECT * FROM agendamentos ORDER BY id DESC").fetchall(); con.close()
+    except: ags=[]
+    albuns=get_albuns()
+    lista=""
+    for ag in ags:
+        try:
+            nome=ag[1]; whats=ag[2]; tipo=ag[3]; data_e=ag[4]; local=ag[6]; mens=ag[7]; criado=ag[9]
+            lista+=f'<div style="background:#0a0a0a;border:1px solid #333;padding:12px;margin:8px 0;border-radius:8px"><b>{nome}</b> <small>{criado}</small><br><b style="color:#d4af37">{tipo}</b> - {data_e} em {local}<br><small>{whats}</small><br><div style="background:#111;padding:8px;border-radius:6px;margin:6px 0">{mens}</div></div>'
+        except: continue
+    fotos_html=""
+    for f in fotos[:100]:
+        img=f['url'] if isinstance(f,dict) else (f[7] if len(f)>7 and f[7] else '/static/uploads/'+f[1])
+        fid=f['public_id'] if isinstance(f,dict) else f[0]
+        title=f['titulo'] if isinstance(f,dict) else f[2]
+        fotos_html+=f'<div style="background:#111;border-radius:8px;overflow:hidden"><img src="{img}" style="width:100%;height:120px;object-fit:cover"><div style="padding:6px"><small>{title}</small><br><a href="/delete/{fid}" style="color:red;font-size:12px">Apagar</a></div></div>'
+    albuns_html=""
     for a in albuns:
         nome=a['album'] if isinstance(a,dict) else a[0]; qtd=a['qtd'] if isinstance(a,dict) else a[1]
-        html+=f'<div style="display:flex;justify-content:space-between;background:#0a0a0a;padding:8px;border-radius:6px;margin:5px 0"><span>📁 {nome} ({qtd})</span><span><a href="/?album={nome}" style="color:#d4af37">Ver</a> <a href="/delete_album/{nome}" style="color:red;margin-left:5px">Apagar</a></span></div>'
-    html+=f'</div></div><h3>Fotos ({len(fotos)})</h3><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">'
-    for f in fotos[:60]:
-        img=f['url'] if isinstance(f,dict) else (f[7] if len(f)>7 and f[7] else '/static/uploads/'+f[1]); fid=f['public_id'] if isinstance(f,dict) else f[0]
-        title=f['titulo'] if isinstance(f,dict) else f[2]
-        html+=f'<div style="background:#111;border-radius:8px;overflow:hidden"><img src="{img}" style="width:100%;height:120px;object-fit:cover"><div style="padding:5px"><small>{title}</small><br><a href="/delete/{fid}" style="color:red">Apagar</a></div></div>'
-    html+='</div></div></body></html>'; return html
+        albuns_html+=f'<div style="display:flex;justify-content:space-between;background:#0a0a0a;padding:10px;border-radius:8px;margin:6px 0"><span>📁 {nome} ({qtd})</span><span><a href="/?album={nome}" target="_blank" style="color:#d4af37;margin-right:8px">Ver</a><a href="/delete_album/{nome}" style="color:red">Apagar</a></span></div>'
+    return f'<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="background:#0a0a0a;color:#fff;font-family:Arial;margin:0"><header style="background:#00aa00;color:#fff;padding:12px 20px;display:flex;justify-content:space-between"><b>☁️ NUVEM ATIVA - {len(fotos)} fotos!</b><a href="/admin/logout" style="color:#fff">Sair</a></header><div style="padding:20px;max-width:1200px;margin:auto"><div style="display:grid;grid-template-columns:1fr 1fr;gap:20px"><div style="background:#111;padding:20px;border-radius:12px"><h3 style="color:#d4af37">📸 Postar Foto</h3><form action="/upload" method="post" enctype="multipart/form-data"><input name="album" placeholder="Ex: Casamento Ana" required style="width:100%;padding:12px;margin:6px 0;background:#1a1a1a;border:1px solid #333;color:#fff;border-radius:8px"><input name="titulo" placeholder="Título" required style="width:100%;padding:12px;margin:6px 0;background:#1a1a1a;border:1px solid #333;color:#fff;border-radius:8px"><input type="file" name="foto" accept="image/*" required style="width:100%;padding:10px;margin:10px 0;color:#fff"><button style="width:100%;background:#d4af37;color:#000;padding:14px;border:none;border-radius:8px;font-weight:bold">☁️ POSTAR NA NUVEM</button></form></div><div style="background:#111;padding:20px;border-radius:12px"><h3>📁 Pastas ({len(albuns)})</h3><div style="max-height:350px;overflow:auto">{albuns_html if albuns_html else "Nenhuma pasta"}</div></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px"><div><h3>Fotos ({len(fotos)})</h3><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;max-height:600px;overflow:auto;padding:10px;background:#0f0f0f;border-radius:10px">{fotos_html if fotos_html else "Nenhuma foto"}</div></div><div style="background:#111;padding:20px;border-radius:12px"><h3 style="color:#25D366">💬 Mensagens ({len(ags)})</h3><div style="max-height:600px;overflow:auto">{lista if lista else "Nenhuma mensagem ainda - quando cliente preencher formulário vai aparecer aqui!"}</div></div></div></div></body></html>'
 
 @app.route("/admin/logout")
 def logout(): session.pop("admin",None); return redirect("/admin")
@@ -171,11 +157,9 @@ def upload():
                 result=cloudinary.uploader.upload(file, folder=f"alice-fotos-jumirim/{album}", public_id=datetime.now().strftime("%Y%m%d%H%M%S_")+secure_filename(file.filename).rsplit('.',1)[0], overwrite=True)
                 url=result['secure_url']; public_id=result['public_id']
                 con=sqlite3.connect(DB_PATH); con.execute("INSERT INTO fotos (filename,titulo,categoria,album,data,likes,url,public_id) VALUES (?,?,?,?,?,?,?,?)",(url,titulo,"Ensaio",album,datetime.now().strftime("%d/%m/%Y"),0,url,public_id)); con.commit(); con.close()
-                print(f"Upload Cloudinary OK: {public_id}")
             except Exception as e:
-                print(f"Erro upload cloudinary: {e}")
                 filename=datetime.now().strftime("%Y%m%d%H%M%S_")+secure_filename(file.filename); file.save(os.path.join(UPLOAD_FOLDER, filename))
-                con=sqlite3.connect(DB_PATH); con.execute("INSERT INTO fotos (filename,titulo,categoria,album,data,likes) VALUES (?,?,?,?,?,0)",(filename,titulo,"Ensaio",album,datetime.now().strftime("%d/%m/%Y"))); con.commit(); con.close()
+                con=sqlite3.connect(DB_PATH); con.execute("INSERT INTO fotos (filename,titulo,categoria,album,data,likes,url,public_id) VALUES (?,?,?,?,?,?,?,?)",(filename,titulo,"Ensaio",album,datetime.now().strftime("%d/%m/%Y"),0,filename,f"local_{filename}")); con.commit(); con.close()
         else:
             filename=datetime.now().strftime("%Y%m%d%H%M%S_")+secure_filename(file.filename); file.save(os.path.join(UPLOAD_FOLDER, filename))
             con=sqlite3.connect(DB_PATH); con.execute("INSERT INTO fotos (filename,titulo,categoria,album,data,likes) VALUES (?,?,?,?,?,0)",(filename,titulo,"Ensaio",album,datetime.now().strftime("%d/%m/%Y"))); con.commit(); con.close()
@@ -185,8 +169,7 @@ def upload():
 def delete_foto(foto_id):
     try:
         if USE_CLOUDINARY and "/" in str(foto_id):
-            try:
-                import cloudinary.uploader; cloudinary.uploader.destroy(foto_id)
+            try: import cloudinary.uploader; cloudinary.uploader.destroy(foto_id)
             except: pass
             try: con=sqlite3.connect(DB_PATH); con.execute("DELETE FROM fotos WHERE public_id=?",(foto_id,)); con.commit(); con.close()
             except: pass
@@ -206,7 +189,7 @@ def delete_album(album_name):
         if USE_CLOUDINARY:
             try:
                 import cloudinary.api, cloudinary.uploader
-                resources=cloudinary.api.resources(type="upload", prefix=f"alice-fotos-jumirim/{album_name}", max_results=100)
+                resources=cloudinary.api.resources(type="upload", prefix=f"alice-fotos-jumirim/{album_name}", max_results=200)
                 for r in resources.get('resources',[]): cloudinary.uploader.destroy(r['public_id'])
                 try: cloudinary.api.delete_folder(f"alice-fotos-jumirim/{album_name}")
                 except: pass
