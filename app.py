@@ -12,7 +12,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 SENHA = "666777"
 WHATSAPP = "5515996216025"
 INSTAGRAM = "https://www.instagram.com/alicefotosjumirim"
-GOOGLE_REVIEW = "https://www.google.com/maps/search/?api=1&query=Alice+Fotos+Jumirim+Jumirim+SP"
+GOOGLE_REVIEW = "/avaliar"
 
 CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME", "")
 CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY", "")
